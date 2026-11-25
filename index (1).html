@@ -1,0 +1,1078 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Truth Lens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>
+  tailwind.config = {
+    theme: { extend: { fontFamily: {
+      display: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+      sans: ['Inter', 'system-ui', 'sans-serif'],
+      mono: ['JetBrains Mono', 'ui-monospace', 'Menlo', 'monospace']
+    } } }
+  };
+</script>
+<style>
+  /* Layout concept: sticky top bar, one dashboard column (analyze, then evidence) with an overview rail beside it on wide screens. Single dark navy look by choice. */
+  :root {
+    --bg: #070d1f;
+    --bg-2: #0b1530;
+    --panel: #0e1a3a;
+    --panel-2: #12214a;
+    --line: #20305e;
+    --fg: #e6ecff;
+    --muted: #8fa0c8;
+    --cyan: #22d3ee;
+    --violet: #8b5cf6;
+    --good: #34d399;
+    --warn: #fbbf24;
+    --bad: #f87171;
+    --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    color-scheme: dark;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    background-image:
+      radial-gradient(900px 420px at 85% -10%, rgba(139, 92, 246, 0.18), transparent 60%),
+      radial-gradient(800px 400px at 5% 0%, rgba(34, 211, 238, 0.12), transparent 60%),
+      linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
+    background-size: auto, auto, 36px 36px, 36px 36px;
+    background-attachment: fixed;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+    z-index: 40; background: var(--bg);
+  }
+  *:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+  h1, h2, h3, .font-display { font-family: var(--font-display); text-wrap: balance; }
+  .mono { font-family: var(--font-mono); }
+  .label { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .panel { background: linear-gradient(180deg, var(--panel), var(--bg-2)); border: 1px solid var(--line); border-radius: 14px; }
+  .panel-flat { background: rgba(14, 26, 58, 0.6); border: 1px solid var(--line); border-radius: 10px; }
+
+  .topbar {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30;
+    background: rgba(7, 13, 31, 0.88); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px)));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .nav a {
+    white-space: nowrap; padding: 8px 14px; border-radius: 8px; color: var(--muted);
+    text-decoration: none; font-weight: 500; border: 1px solid transparent;
+  }
+  .nav a:hover { color: var(--fg); background: rgba(34, 211, 238, 0.06); }
+  .nav a[aria-current="page"] { color: var(--fg); background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.35); }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 18px; border-radius: 10px; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; font-size: 14px; transition: transform .12s, opacity .12s, background .12s;
+  }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: linear-gradient(90deg, var(--cyan), var(--violet)); color: #05101f; }
+  .btn-primary:not(:disabled):hover { transform: translateY(-1px); }
+  .btn-ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+  .btn-ghost:not(:disabled):hover { background: rgba(34, 211, 238, 0.08); border-color: rgba(34, 211, 238, 0.4); }
+  .btn-danger { background: rgba(248, 113, 113, 0.12); color: #fecaca; border-color: rgba(248, 113, 113, 0.4); }
+  .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+
+  .tab {
+    flex: 1 1 0; min-width: 0; padding: 10px 8px; border-radius: 10px; cursor: pointer; font-weight: 600;
+    color: var(--muted); background: transparent; border: 1px solid var(--line); display: flex;
+    flex-direction: column; align-items: center; gap: 4px; font-size: 13px;
+  }
+  .tab:hover { color: var(--fg); }
+  .tab[aria-selected="true"] { color: var(--fg); border-color: var(--cyan); background: rgba(34, 211, 238, 0.09); box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25) inset; }
+
+  .field {
+    width: 100%; background: rgba(7, 13, 31, 0.7); border: 1px solid var(--line); color: var(--fg);
+    border-radius: 10px; padding: 10px 12px; font: inherit;
+  }
+  .field::placeholder { color: #5f7099; }
+  .field:focus { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18); }
+  .field[aria-invalid="true"] { border-color: var(--bad); }
+
+  .drop {
+    border: 1.5px dashed #34487f; border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer;
+    background: rgba(7, 13, 31, 0.5); transition: border-color .15s, background .15s;
+  }
+  .drop:hover, .drop[data-over="true"] { border-color: var(--cyan); background: rgba(34, 211, 238, 0.07); }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 11px;
+    letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; border: 1px solid; white-space: nowrap;
+  }
+  .pill-high { color: #fecaca; background: rgba(248, 113, 113, 0.12); border-color: rgba(248, 113, 113, 0.4); }
+  .pill-medium { color: #fde68a; background: rgba(251, 191, 36, 0.12); border-color: rgba(251, 191, 36, 0.4); }
+  .pill-low { color: #a5f3fc; background: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.35); }
+  .pill-ok { color: #a7f3d0; background: rgba(52, 211, 153, 0.1); border-color: rgba(52, 211, 153, 0.35); }
+  .pill-sim { color: #ddd6fe; background: rgba(139, 92, 246, 0.16); border-color: rgba(139, 92, 246, 0.5); }
+  .pill-live { color: #05101f; background: var(--good); border-color: var(--good); }
+  .pill-neutral { color: var(--muted); background: transparent; border-color: var(--line); }
+
+  .banner-sim { background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.55); border-radius: 12px; }
+  .banner-live { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.45); border-radius: 12px; }
+
+  .bar { height: 8px; border-radius: 99px; background: rgba(32, 48, 94, 0.9); overflow: hidden; }
+  .bar > span { display: block; height: 100%; border-radius: 99px; }
+
+  .code {
+    font-family: var(--font-mono); font-size: 12px; background: rgba(7, 13, 31, 0.8); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; overflow-x: auto; white-space: pre; color: #c7d4f5;
+  }
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] > summary .chev { transform: rotate(90deg); }
+  .chev { transition: transform .15s; display: inline-block; }
+
+  .modal-back { position: fixed; inset: 0; z-index: 60; background: rgba(3, 7, 18, 0.75); display: flex; align-items: center; justify-content: center;
+    padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+  .modal { width: 100%; max-width: 760px; max-height: 100%; overflow: auto; }
+  .toast {
+    position: fixed; left: 50%; transform: translateX(-50%); z-index: 70;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel-2); border: 1px solid var(--cyan); border-radius: 10px; padding: 10px 16px; max-width: calc(100% - 32px);
+  }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(34, 211, 238, 0.25); border-top-color: var(--cyan); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } .btn, .chev { transition: none; } }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+  .tnum { font-variant-numeric: tabular-nums; }
+</style>
+
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script>
+(function () {
+  const { useState, useEffect, useRef, useMemo } = React;
+  const html = htm.bind(React.createElement);
+
+  /* ------------------------------------------------------------------ */
+  /* Constants                                                           */
+  /* ------------------------------------------------------------------ */
+  const MODALITIES = {
+    text:  { label: 'Text',  icon: 'T' },
+    image: { label: 'Image', icon: 'I', exts: ['jpg', 'jpeg', 'png', 'webp', 'gif'], maxMB: 10,
+             accept: 'image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.webp,.gif' },
+    audio: { label: 'Audio', icon: 'A', exts: ['mp3', 'wav', 'm4a', 'ogg', 'webm'], maxMB: 25,
+             accept: 'audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/webm,.mp3,.wav,.m4a,.ogg,.webm' },
+    video: { label: 'Video', icon: 'V', exts: ['mp4', 'webm', 'mov'], maxMB: 50,
+             accept: 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov' }
+  };
+
+  const MODULES = {
+    mllm:  { name: 'Multimodal LLM', desc: 'Reads the content, checks claims against world knowledge and describes what it sees or hears.',
+             tiers: ['Content reads as plausible and internally coherent.', 'Some claims could not be backed by context.', 'Several claims or details look implausible.'] },
+    cv:    { name: 'Computer Vision', desc: 'Looks for lighting, texture and compression patterns that suggest editing or generation.',
+             tiers: ['Visual statistics look consistent across the frame.', 'A few regions behave differently from the rest.', 'Several regions show editing-like patterns.'] },
+    audio: { name: 'Audio Deepfake Detection', desc: 'Analyses pitch, spectrum and breathing patterns for signs of synthetic or altered speech.',
+             tiers: ['Speech shows natural variation.', 'Some features are slightly unnatural.', 'Several features match synthetic speech patterns.'] },
+    cross: { name: 'Cross-Modal Reasoning', desc: 'Compares text, visuals, audio and the supplied claim to see whether they tell the same story.',
+             tiers: ['Parts of the content agree with each other.', 'Some parts do not fully agree.', 'Parts of the content contradict each other.'] },
+    xai:   { name: 'Explainable AI', desc: 'Turns findings into plain-language evidence with weights and uncertainty.', tiers: ['', '', ''] }
+  };
+
+  const PIPELINE = {
+    text:  ['mllm', 'cross', 'xai'],
+    image: ['mllm', 'cv', 'cross', 'xai'],
+    audio: ['audio', 'mllm', 'cross', 'xai'],
+    video: ['cv', 'audio', 'mllm', 'cross', 'xai']
+  };
+
+  const ISSUES = [
+    { m: 'mllm', mods: ['text'], label: 'Urgency-driven, sensational framing', detail: 'The wording pushes the reader to react or share before checking.', why: 'Emotional pressure is common in misleading posts, though honest opinion writing uses it too.' },
+    { m: 'mllm', mods: ['text'], label: 'Central claim has no named source or date', detail: 'The main statement is not tied to a person, document or time.', why: 'Claims without a checkable origin are harder to verify and easier to fabricate.' },
+    { m: 'mllm', mods: ['text'], label: 'Figures stated without a reference', detail: 'Numbers appear with no study, dataset or official source attached.', why: 'Unreferenced statistics are a frequent carrier of invented detail.' },
+    { m: 'mllm', mods: ['text'], label: 'Very uniform sentence rhythm', detail: 'Sentence length and structure barely vary across the passage.', why: 'Machine-generated text often shows this pattern, but so does formal writing.' },
+    { m: 'mllm', mods: ['image'], label: 'Implausible objects or garbled text in the scene', detail: 'Signs or labels in the scene do not form readable words.', why: 'Image generators often fail on small text and fine object detail.' },
+    { m: 'mllm', mods: ['image', 'video'], label: 'Scene details do not fit the stated place or time', detail: 'Clothing, vehicles or signage seem out of step with the context given.', why: 'Mismatched context is a common sign of reused or restaged media.' },
+    { m: 'mllm', mods: ['audio'], label: 'Spoken claims carry no verifiable context', detail: 'The transcript names events or figures without any way to confirm them.', why: 'Convincing voices can carry unverified claims, so the claim needs its own check.' },
+    { m: 'mllm', mods: ['video'], label: 'Narration and on-screen text disagree', detail: 'Spoken statements and captions in the clip point to different facts.', why: 'Edited clips often combine material recorded at different times.' },
+    { m: 'cv', mods: ['image', 'video'], label: 'Lighting direction differs between subject and background', detail: 'Shadows and highlights on the subject point a different way from the scene.', why: 'Composited elements rarely share the lighting of the surrounding scene.' },
+    { m: 'cv', mods: ['image', 'video'], label: 'Texture smoothing along face and hair edges', detail: 'Edge regions look softer and more uniform than the rest of the frame.', why: 'Face swaps and generated faces often blur boundaries.' },
+    { m: 'cv', mods: ['image', 'video'], label: 'Compression levels differ between regions', detail: 'Some areas were compressed differently from their surroundings.', why: 'This can indicate a spliced or pasted region, or simply repeated re-saving.' },
+    { m: 'cv', mods: ['image', 'video'], label: 'Repeated texture patches in the background', detail: 'Small areas of background repeat almost exactly.', why: 'Cloning tools and some generators leave repeated patches.' },
+    { m: 'cv', mods: ['video'], label: 'Face boundary flickers between frames', detail: 'The outline of the face shifts slightly from frame to frame.', why: 'Frame-by-frame face replacement can leave unstable edges.' },
+    { m: 'cv', mods: ['video'], label: 'Blink pattern outside the typical range', detail: 'Blinking is rarer or more regular than typical footage.', why: 'Some synthetic faces blink unnaturally, though camera angle and context also matter.' },
+    { m: 'cv', mods: ['video'], label: 'Encoding discontinuity partway through the clip', detail: 'Compression behaviour changes abruptly at one point in the timeline.', why: 'It can mark where footage was joined, or just a re-encode.' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Pitch contour is unusually uniform', detail: 'Pitch moves within a narrower band than typical natural speech.', why: 'Some voice cloning systems flatten natural pitch movement.' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Little breathing or room-noise variation', detail: 'Breaths and background noise are missing or look looped.', why: 'Real recordings contain irregular breaths and room sound.' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Sharp spectral cut-off above the usual speech range', detail: 'High frequencies drop away abruptly.', why: 'Certain synthesis and compression pipelines produce a hard cut-off.' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Abrupt prosody shifts at phrase boundaries', detail: 'Tone and pacing change suddenly between phrases.', why: 'Stitched or generated phrases may not blend smoothly.' },
+    { m: 'cross', mods: ['image'], label: 'Caption does not match what the image shows', detail: 'The supplied claim and the visible scene describe different things.', why: 'Real images are often reused under a false caption.' },
+    { m: 'cross', mods: ['video'], label: 'Lip movement drifts from the audio track', detail: 'Mouth shapes and speech slip out of sync at several points.', why: 'Dubbed or generated audio can fall out of step with the video.' },
+    { m: 'cross', mods: ['video'], label: 'Caption conflicts with the visible setting', detail: 'The place or event named does not fit what is on screen.', why: 'Old footage is often presented as a new event.' },
+    { m: 'cross', mods: ['audio'], label: 'Spoken claim is not supported by the supplied context', detail: 'The speaker says something the accompanying claim does not back up.', why: 'Mismatched context can show repurposed or fabricated audio.' },
+    { m: 'cross', mods: ['text'], label: 'Statements inside the text contradict each other', detail: 'Two parts of the passage cannot both be true.', why: 'Internal contradictions are a weak signal of careless or fabricated writing.' },
+    { m: 'cross', mods: ['text'], label: 'Headline-style claim overstates the supporting detail', detail: 'The strongest statement goes further than the evidence offered.', why: 'Overstated framing is common in misleading summaries.' }
+  ];
+
+  const PASSES = [
+    { m: 'mllm', mods: ['text'], label: 'Claim names a source or date' },
+    { m: 'mllm', mods: ['image', 'video', 'audio'], label: 'Content is coherent with the context supplied' },
+    { m: 'cv', mods: ['image', 'video'], label: 'Lighting is consistent across the scene' },
+    { m: 'cv', mods: ['image', 'video'], label: 'No region-level compression mismatch found' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Natural breathing and noise variation present' },
+    { m: 'audio', mods: ['audio', 'video'], label: 'Pitch moves within a natural range' },
+    { m: 'cross', mods: ['text', 'image', 'audio', 'video'], label: 'No contradiction found between the parts checked' }
+  ];
+
+  const VERDICT = {
+    low:   { label: 'Few risk signals',    color: 'var(--good)', pill: 'pill-ok',     text: 'The checks that ran raised little concern. This does not prove the content is authentic.' },
+    mixed: { label: 'Mixed signals',       color: 'var(--warn)', pill: 'pill-medium', text: 'Some checks raised concern and others did not. Verify with an independent source.' },
+    high:  { label: 'Strong risk signals', color: 'var(--bad)',  pill: 'pill-high',   text: 'Several checks raised concern. Treat this as a reason to look closer, not as proof of manipulation.' }
+  };
+  const verdictOf = (a) => (a >= 70 ? 'low' : a >= 40 ? 'mixed' : 'high');
+
+  const SIM_NOTE = 'No detection model produced these numbers. They are generated from the input name and wording so you can see how the interface behaves.';
+
+  /* ------------------------------------------------------------------ */
+  /* Helpers                                                             */
+  /* ------------------------------------------------------------------ */
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  const fmtSize = (b) => (b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+  const fmtDate = (t) => new Date(t).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const sleep = (ms, signal) => new Promise((res, rej) => {
+    const t = setTimeout(res, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); rej(new DOMException('Aborted', 'AbortError')); }, { once: true });
+  });
+  function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function rng(seed) {
+    let a = seed;
+    return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  function shuffle(arr, r) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  const mean = (a) => a.reduce((s, x) => s + x, 0) / (a.length || 1);
+
+  function biasFor(input) {
+    const text = input.text || '';
+    const l = (text + ' ' + (input.fileName || '') + ' ' + (input.caption || '')).toLowerCase();
+    let b = 0;
+    ['fake', 'deepfake', 'synthetic', 'ai-generated', 'aigen', 'edited', 'photoshop', 'clone', 'spliced', 'fabricated', 'shocking', "you won't believe", '100% proven', "they don't want you", 'miracle', 'leaked', 'urgent', 'breaking'].forEach((k) => { if (l.includes(k)) b -= 14; });
+    ['original', 'raw', 'verified', 'authentic', 'unedited', 'official', 'press release', 'source:', 'according to'].forEach((k) => { if (l.includes(k)) b += 10; });
+    if (text.length > 30) {
+      const up = (text.match(/[A-Z]/g) || []).length, lo = (text.match(/[a-z]/g) || []).length;
+      if (up / (up + lo || 1) > 0.45) b -= 12;
+      b -= Math.min(12, (text.match(/!/g) || []).length * 3);
+    }
+    return clamp(b, -45, 25);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Result builder. Simulated unless a module returned live output.     */
+  /* ------------------------------------------------------------------ */
+  function buildResult(input, live, narrativeLive, opts) {
+    live = live || {};
+    const seed = hash([input.modality, input.text || '', input.fileName || '', input.size || 0, input.caption || ''].join('|'));
+    const r = rng(seed);
+    const base = clamp(Math.round(62 + r() * 24 - 6 + biasFor(input)), 5, 96);
+    const pipe = PIPELINE[input.modality];
+    const hasContext = input.modality === 'text' || !!(input.caption && input.caption.trim());
+    const modules = [], indicators = [], passes = [];
+
+    pipe.forEach((id) => {
+      if (id === 'xai') return;
+      const lv = live[id];
+      let score, conf, summary, status;
+      if (lv) {
+        score = lv.authenticity; conf = lv.confidence; summary = lv.summary || 'Returned by the configured endpoint.'; status = 'live';
+        lv.indicators.forEach((ind, i) => indicators.push({ id: id + '-live-' + i, module: id, label: ind.label, detail: ind.detail, why: ind.why || '', severity: ind.severity }));
+      } else {
+        status = 'simulated';
+        score = clamp(Math.round(base + (r() * 20 - 10)), 3, 98);
+        conf = clamp(Math.round(60 + r() * 25), 30, 94);
+        const pool = ISSUES.filter((x) => x.m === id && x.mods.includes(input.modality));
+        const n = Math.min(pool.length, score >= 75 ? 0 : score >= 55 ? 1 : score >= 35 ? 2 : 3);
+        const risk = 100 - score;
+        shuffle(pool, r).slice(0, n).forEach((x, i) => {
+          const sev = risk >= 60 ? (i === 0 ? 'high' : 'medium') : risk >= 40 ? (i === 0 ? 'medium' : 'low') : 'low';
+          indicators.push({ id: id + '-sim-' + i, module: id, label: x.label, detail: x.detail, why: x.why, severity: sev });
+        });
+        if (score >= 55) {
+          const pp = PASSES.filter((x) => x.m === id && x.mods.includes(input.modality));
+          shuffle(pp, r).slice(0, 1 + (r() > 0.5 ? 1 : 0)).forEach((x) => passes.push({ module: id, label: x.label }));
+        }
+        summary = MODULES[id].tiers[score >= 70 ? 0 : score >= 40 ? 1 : 2];
+      }
+      if (id === 'cross') {
+        summary += input.modality === 'text' ? ' Compared statements inside the text with each other.'
+          : hasContext ? ' Compared the supplied caption with the media.'
+          : ' No caption was supplied, so only internal consistency of the media was checked.';
+        if (!hasContext) conf = clamp(conf - 12, 25, 94);
+      }
+      modules.push({ id, name: MODULES[id].name, score: clamp(Math.round(score), 0, 100), confidence: clamp(Math.round(conf), 0, 100), status, summary });
+    });
+
+    const authenticity = Math.round(mean(modules.map((m) => m.score)));
+    let confidence = mean(modules.map((m) => m.confidence));
+    const limitations = [
+      'False positives and false negatives are possible. Edited but honest media can raise signals, and skilled forgeries can pass.',
+      'Scores describe patterns in the file you supplied, not who made it or why.',
+      'High-impact decisions need human review and an independent source.'
+    ];
+    if (input.modality === 'text' && (input.text || '').length < 120) { confidence -= 12; limitations.unshift('The text is short, so confidence is reduced.'); }
+    if (input.modality !== 'text' && (input.size || 0) < 50 * 1024) { confidence -= 8; limitations.unshift('The file is small, which limits the signal available for analysis.'); }
+    if (!hasContext) limitations.unshift('No claim or caption was supplied, so cross-modal comparison was limited.');
+    confidence = clamp(Math.round(confidence), 20, 96);
+
+    const wmap = { high: 3, medium: 2, low: 1 };
+    const total = indicators.reduce((s, i) => s + wmap[i.severity], 0) || 1;
+    let given = 0;
+    const evidence = indicators.map((ind, i) => {
+      const w = i === indicators.length - 1 ? 100 - given : Math.round((wmap[ind.severity] / total) * 100);
+      given += w;
+      const unc = confidence >= 75 ? 'Lower' : confidence >= 55 ? 'Moderate' : 'Higher';
+      return { id: ind.id, module: ind.module, title: ind.label, observed: ind.detail, why: ind.why, weight: w, severity: ind.severity, uncertainty: unc };
+    });
+
+    const top = indicators.slice().sort((a, b) => wmap[b.severity] - wmap[a.severity])[0];
+    const templateNarrative = indicators.length === 0
+      ? 'None of the ' + modules.length + ' checks raised a concern. That lowers the risk but does not prove the content is authentic.'
+      : indicators.length + ' risk signal' + (indicators.length > 1 ? 's were' : ' was') + ' raised across ' + modules.length + ' checks. The strongest was "' + top.label + '". Treat this as a reason to look closer, not as proof of manipulation.';
+
+    const simCount = modules.filter((m) => m.status === 'simulated').length;
+    const mode = simCount === modules.length ? 'simulated' : simCount === 0 ? 'live' : 'mixed';
+
+    return {
+      id: (opts && opts.id) || ('TL-' + (Date.now().toString(36) + Math.random().toString(36).slice(2, 5)).toUpperCase()),
+      createdAt: (opts && opts.createdAt) || Date.now(),
+      sample: !!(opts && opts.sample),
+      modality: input.modality,
+      input: { fileName: input.fileName || '', size: input.size || 0, text: (input.text || '').slice(0, 600), caption: input.caption || '' },
+      mode, authenticity, confidence, verdict: verdictOf(authenticity),
+      modules, indicators, passes, evidence, limitations,
+      narrative: narrativeLive || templateNarrative,
+      narrativeSource: narrativeLive ? 'live' : 'template'
+    };
+  }
+
+  function makeSamples() {
+    const now = Date.now();
+    const defs = [
+      { modality: 'image', fileName: 'press_conference_original.jpg', size: 2400000, caption: 'Official photo from the press conference.' },
+      { modality: 'audio', fileName: 'ceo_voicemail_cloned.wav', size: 840000, caption: '' },
+      { modality: 'text', text: 'BREAKING!!! Shocking leaked memo PROVES the miracle cure they do not want you to see. Share before it is deleted!' }
+    ];
+    return defs.map((d, i) => buildResult(d, {}, null, { id: 'TL-SAMPLE-' + (i + 1), createdAt: now - (i + 1) * 5 * 3600 * 1000, sample: true }));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Live module calls (only used when an endpoint is configured)        */
+  /* ------------------------------------------------------------------ */
+  function normaliseModule(data, name) {
+    if (!data || typeof data !== 'object' || typeof data.authenticity !== 'number' || data.authenticity < 0 || data.authenticity > 100) {
+      throw new Error(name + ' responded, but the JSON did not include "authenticity" as a number from 0 to 100. See the Pipeline page for the expected format.');
+    }
+    const sevs = ['low', 'medium', 'high'];
+    return {
+      authenticity: data.authenticity,
+      confidence: typeof data.confidence === 'number' ? clamp(data.confidence, 0, 100) : 60,
+      summary: typeof data.summary === 'string' ? data.summary : '',
+      indicators: (Array.isArray(data.indicators) ? data.indicators : []).filter((x) => x && typeof x.label === 'string').map((x) => ({
+        label: x.label, detail: String(x.detail || ''), why: String(x.why || ''), severity: sevs.includes(x.severity) ? x.severity : 'low'
+      }))
+    };
+  }
+  async function postTo(url, key, body, signal, name) {
+    const headers = {};
+    if (key) headers.Authorization = 'Bearer ' + key;
+    if (!(body instanceof FormData)) headers['Content-Type'] = 'application/json';
+    let res;
+    try { res = await fetch(url, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body), headers, signal }); }
+    catch (e) {
+      if (e.name === 'AbortError') throw e;
+      throw new Error('Could not reach the ' + name + ' endpoint. This is usually a network or CORS problem. The hosted preview also blocks outside requests, so run the downloaded file to use live endpoints.');
+    }
+    if (!res.ok) throw new Error(name + ' endpoint returned HTTP ' + res.status + '.');
+    try { return await res.json(); } catch (e) { throw new Error(name + ' endpoint did not return valid JSON.'); }
+  }
+  async function callModule(id, input, file, cfg, signal) {
+    const fd = new FormData();
+    fd.append('module', id); fd.append('modality', input.modality);
+    if (input.text) fd.append('text', input.text);
+    if (input.caption) fd.append('caption', input.caption);
+    if (file) fd.append('file', file, file.name);
+    const data = await postTo(cfg.urls[id], cfg.keys[id], fd, signal, MODULES[id].name);
+    return normaliseModule(data, MODULES[id].name);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Reports                                                             */
+  /* ------------------------------------------------------------------ */
+  function modeNote(res) {
+    const sim = res.modules.filter((m) => m.status === 'simulated').map((m) => m.name);
+    const live = res.modules.filter((m) => m.status === 'live').map((m) => m.name);
+    if (res.mode === 'simulated') return 'SIMULATED DEMO RESULT. ' + SIM_NOTE;
+    if (res.mode === 'mixed') return 'PARTLY SIMULATED. Live: ' + live.join(', ') + '. Simulated: ' + sim.join(', ') + '.';
+    return 'LIVE ANALYSIS. Every detection module returned output from a configured endpoint.';
+  }
+  function toMarkdown(res) {
+    const v = VERDICT[res.verdict];
+    const L = [];
+    L.push('# Truth Lens analysis report', '', '> ' + modeNote(res), '');
+    L.push('- Report ID: ' + res.id, '- Date: ' + fmtDate(res.createdAt), '- Input type: ' + MODALITIES[res.modality].label);
+    if (res.input.fileName) L.push('- File: ' + res.input.fileName + ' (' + fmtSize(res.input.size) + ')');
+    if (res.input.caption) L.push('- Claim or caption: ' + res.input.caption);
+    if (res.input.text) L.push('- Text analysed: ' + res.input.text.replace(/\s+/g, ' '));
+    L.push('', '## Assessment', '', '- Authenticity score: ' + res.authenticity + ' / 100', '- Confidence: ' + res.confidence + '%', '- Reading: ' + v.label, '', v.text, '', res.narrative, '');
+    L.push('## Modules', '', '| Module | Source | Score | Confidence |', '|---|---|---|---|');
+    res.modules.forEach((m) => L.push('| ' + m.name + ' | ' + (m.status === 'live' ? 'Live endpoint' : 'Simulated') + ' | ' + m.score + ' | ' + m.confidence + '% |'));
+    L.push('', '## Risk indicators', '');
+    if (!res.indicators.length) L.push('No risk indicators were raised.');
+    res.indicators.forEach((i) => L.push('- [' + i.severity.toUpperCase() + '] ' + i.label + ' (' + MODULES[i.module].name + '): ' + i.detail));
+    if (res.passes.length) { L.push('', '### Checks that passed', ''); res.passes.forEach((p) => L.push('- ' + p.label)); }
+    L.push('', '## Evidence', '');
+    if (!res.evidence.length) L.push('No findings to explain.');
+    res.evidence.forEach((e) => L.push('### ' + e.title, '', '- Observed: ' + e.observed, '- Why it matters: ' + e.why, '- Contribution to risk: ' + e.weight + '%', '- Uncertainty: ' + e.uncertainty, ''));
+    L.push('## Limitations', '');
+    res.limitations.forEach((x) => L.push('- ' + x));
+    return L.join('\n');
+  }
+
+  function download(name, text, type) {
+    const b = new Blob([text], { type });
+    const u = URL.createObjectURL(b);
+    const a = document.createElement('a');
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 1000);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Storage                                                             */
+  /* ------------------------------------------------------------------ */
+  const KEY = 'truthlens.history.v1';
+  function loadHistory() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw === null) return makeSamples();
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : makeSamples();
+    } catch (e) { return makeSamples(); }
+  }
+  function saveHistory(h) { try { localStorage.setItem(KEY, JSON.stringify(h)); } catch (e) { /* storage unavailable */ } }
+
+  /* ---- Backend (Flask) sync. Falls back to localStorage if unreachable. ---- */
+  const API = location.protocol === 'file:' ? 'http://localhost:5000' : location.origin;
+  const apiKey = () => (window.TRUTHLENS_API_KEY || '');
+  async function api(path, opts) {
+    const headers = Object.assign({}, (opts && opts.headers) || {});
+    if (apiKey()) headers.Authorization = 'Bearer ' + apiKey();
+    const res = await fetch(API + path, Object.assign({}, opts, { headers }));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+  const apiSave = (r) => api('/api/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) }).catch(() => {});
+  const apiDelete = (id) => api('/api/history/' + encodeURIComponent(id), { method: 'DELETE' }).catch(() => {});
+  const apiClear = () => api('/api/history', { method: 'DELETE' }).catch(() => {});
+
+  /* ------------------------------------------------------------------ */
+  /* UI pieces                                                           */
+  /* ------------------------------------------------------------------ */
+  function LensMark({ size }) {
+    return html`<svg width=${size || 30} height=${size || 30} viewBox="0 0 32 32" aria-hidden="true">
+      <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#22d3ee" /><stop offset="1" stopColor="#8b5cf6" /></linearGradient></defs>
+      <circle cx="16" cy="16" r="11" fill="none" stroke="url(#lg)" strokeWidth="2.5" />
+      <circle cx="16" cy="16" r="4" fill="url(#lg)" />
+      <path d="M16 1v6M16 25v6M1 16h6M25 16h6" stroke="url(#lg)" strokeWidth="2" strokeLinecap="round" fill="none" />
+    </svg>`;
+  }
+
+  function Gauge({ value, color }) {
+    const R = 54, C = 2 * Math.PI * R;
+    return html`<svg viewBox="0 0 140 140" width="148" height="148" role="img" aria-label=${'Authenticity score ' + value + ' out of 100'}>
+      <circle cx="70" cy="70" r=${R} fill="none" stroke="var(--line)" strokeWidth="10" />
+      <circle cx="70" cy="70" r=${R} fill="none" stroke=${color} strokeWidth="10" strokeLinecap="round" strokeDasharray=${(C * value / 100) + ' ' + C} transform="rotate(-90 70 70)" />
+      <text x="70" y="74" textAnchor="middle" fill="var(--fg)" fontSize="36" fontWeight="700" style=${{ fontFamily: 'var(--font-display)' }}>${value}</text>
+      <text x="70" y="94" textAnchor="middle" fill="var(--muted)" fontSize="11" style=${{ fontFamily: 'var(--font-mono)' }}>OF 100</text>
+    </svg>`;
+  }
+
+  function SourcePill({ status }) {
+    return status === 'live'
+      ? html`<span className="pill pill-live">Live</span>`
+      : html`<span className="pill pill-sim">Simulated</span>`;
+  }
+
+  function validateFile(modality, f) {
+    const M = MODALITIES[modality];
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    if (f.size === 0) return 'This file is empty. Choose a file that has content.';
+    if (!M.exts.includes(ext)) return 'Unsupported ' + M.label.toLowerCase() + ' format ".' + ext + '". Use ' + M.exts.map((x) => '.' + x).join(', ') + '.';
+    if (f.type && !f.type.startsWith(modality + '/') && ext !== 'webm') return 'This file reports itself as ' + f.type + ', which is not ' + M.label.toLowerCase() + '. Check that it is the right file.';
+    if (f.size > M.maxMB * 1048576) return 'File is ' + fmtSize(f.size) + '. The demo limit for ' + M.label.toLowerCase() + ' is ' + M.maxMB + ' MB.';
+    return '';
+  }
+
+  function DropZone({ modality, onFile }) {
+    const [over, setOver] = useState(false);
+    const ref = useRef(null);
+    const M = MODALITIES[modality];
+    const open = () => ref.current && ref.current.click();
+    return html`<div>
+      <div className="drop" role="button" tabIndex="0" data-over=${over ? 'true' : 'false'}
+        aria-label=${'Upload ' + M.label.toLowerCase() + ' file. Drag and drop or press Enter to browse.'}
+        onClick=${open}
+        onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}
+        onDragOver=${(e) => { e.preventDefault(); setOver(true); }}
+        onDragLeave=${() => setOver(false)}
+        onDrop=${(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) onFile(f); }}>
+        <div className="font-display" style=${{ fontSize: '16px', fontWeight: 600 }}>Drop your ${M.label.toLowerCase()} file here</div>
+        <div style=${{ color: 'var(--muted)', marginTop: '4px' }}>or click to browse</div>
+        <div className="label" style=${{ marginTop: '12px' }}>${M.exts.map((x) => '.' + x).join('  ')}  ·  up to ${M.maxMB} MB</div>
+      </div>
+      <input ref=${ref} type="file" className="sr-only" tabIndex="-1" accept=${M.accept} aria-hidden="true"
+        onChange=${(e) => { const f = e.target.files && e.target.files[0]; if (f) onFile(f); e.target.value = ''; }} />
+    </div>`;
+  }
+
+  /* ---------------- Analyzer ---------------- */
+  function Analyzer({ cfg, onComplete, toast }) {
+    const [modality, setModality] = useState('text');
+    const [text, setText] = useState('');
+    const [caption, setCaption] = useState('');
+    const [file, setFile] = useState(null);
+    const [fileUrl, setFileUrl] = useState(null);
+    const [touched, setTouched] = useState(false);
+    const [fileError, setFileError] = useState('');
+    const [phase, setPhase] = useState('idle'); // idle | running | error
+    const [steps, setSteps] = useState([]);
+    const [err, setErr] = useState(null);
+    const ctrlRef = useRef(null);
+
+    useEffect(() => {
+      if (!file) { setFileUrl(null); return undefined; }
+      const u = URL.createObjectURL(file);
+      setFileUrl(u);
+      return () => URL.revokeObjectURL(u);
+    }, [file]);
+
+    useEffect(() => () => { if (ctrlRef.current) ctrlRef.current.abort(); }, []);
+
+    const textLen = text.trim().length;
+    const textError = modality === 'text' && touched
+      ? (textLen < 20 ? 'Enter at least 20 characters so there is something to analyse.' : textLen > 5000 ? 'Text is over the 5,000 character limit.' : '') : '';
+
+    const changeModality = (m) => { if (phase === 'running') return; setModality(m); setFile(null); setFileError(''); setTouched(false); setPhase('idle'); setErr(null); };
+    const pickFile = (f) => { const e = validateFile(modality, f); setFileError(e); setFile(e ? null : f); setPhase('idle'); setErr(null); };
+
+    async function run(forceSim) {
+      setTouched(true);
+      if (modality === 'text') { if (textLen < 20 || textLen > 5000) return; }
+      else if (!file) { setFileError('Add a ' + MODALITIES[modality].label.toLowerCase() + ' file to analyse.'); return; }
+      if (caption.length > 500) return;
+
+      const input = { modality, text: modality === 'text' ? text.trim() : '', caption: caption.trim(), fileName: file ? file.name : '', size: file ? file.size : 0 };
+      const pipe = PIPELINE[modality];
+      const labels = ['Prepare input'].concat(pipe.map((id) => MODULES[id].name));
+      setSteps(labels.map((l) => ({ label: l, state: 'pending' })));
+      setPhase('running'); setErr(null);
+      const ctrl = new AbortController(); ctrlRef.current = ctrl;
+      const mark = (i, state) => setSteps((s) => s.map((x, j) => (j === i ? { ...x, state } : x)));
+      const live = {}; let narrativeLive = null;
+      let at = '';
+      try {
+        mark(0, 'running'); await sleep(450, ctrl.signal); mark(0, 'done');
+        for (let i = 0; i < pipe.length; i++) {
+          const id = pipe[i]; at = id; mark(i + 1, 'running');
+          await sleep(550 + (hash(id + input.fileName) % 350), ctrl.signal);
+          if (!forceSim && cfg.failAt === id) throw new Error('Simulated failure for ' + MODULES[id].name + ' (switched on in Config to demo the error state).');
+          if (!forceSim && id !== 'xai' && cfg.urls[id]) live[id] = await callModule(id, input, file, cfg, ctrl.signal);
+          if (!forceSim && id === 'xai' && cfg.urls.xai) {
+            const payload = { modality, findings: Object.keys(live).map((k) => ({ module: k, authenticity: live[k].authenticity, indicators: live[k].indicators })) };
+            const d = await postTo(cfg.urls.xai, cfg.keys.xai, payload, ctrl.signal, MODULES.xai.name);
+            if (!d || typeof d.narrative !== 'string') throw new Error('Explainable AI endpoint did not return a "narrative" string.');
+            narrativeLive = d.narrative;
+          }
+          mark(i + 1, 'done');
+        }
+        const result = buildResult(input, live, narrativeLive);
+        setPhase('idle');
+        onComplete(result);
+      } catch (e) {
+        if (e && e.name === 'AbortError') { setPhase('idle'); toast('Analysis cancelled.'); return; }
+        setErr({ message: e.message || 'Something went wrong.', module: at });
+        setPhase('error');
+      } finally { ctrlRef.current = null; }
+    }
+
+    const cancel = () => { if (ctrlRef.current) ctrlRef.current.abort(); };
+    const running = phase === 'running';
+    const done = steps.filter((s) => s.state === 'done').length;
+    const hasLive = Object.keys(cfg.urls).some((k) => cfg.urls[k]);
+
+    return html`<section className="panel" style=${{ padding: '20px' }} aria-labelledby="an-h">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div style=${{ minWidth: 0 }}>
+          <h2 id="an-h" style=${{ fontSize: '20px', fontWeight: 600 }}>Analyze content</h2>
+          <p style=${{ color: 'var(--muted)', marginTop: '2px' }}>Choose a format, add your content and run the checks.</p>
+        </div>
+        <span className=${'pill ' + (hasLive ? 'pill-low' : 'pill-sim')}>${hasLive ? 'Live endpoints configured' : 'Demo mode: results are simulated'}</span>
+      </div>
+
+      <div role="tablist" aria-label="Content type" className="flex gap-2" style=${{ marginTop: '16px' }}>
+        ${Object.keys(MODALITIES).map((k) => html`<button key=${k} role="tab" type="button" className="tab" aria-selected=${modality === k} disabled=${running} onClick=${() => changeModality(k)}>
+          <span className="mono" style=${{ fontSize: '15px', color: modality === k ? 'var(--cyan)' : 'inherit' }}>${MODALITIES[k].icon}</span>${MODALITIES[k].label}
+        </button>`)}
+      </div>
+
+      <div style=${{ marginTop: '16px' }}>
+        ${modality === 'text' ? html`
+          <label htmlFor="tl-text" className="label" style=${{ display: 'block', marginBottom: '6px' }}>Text to check</label>
+          <textarea id="tl-text" className="field" rows="6" disabled=${running} placeholder="Paste a post, headline or article excerpt…"
+            aria-invalid=${textError ? 'true' : 'false'} aria-describedby="tl-text-help"
+            value=${text} onChange=${(e) => setText(e.target.value)} onBlur=${() => setTouched(true)}></textarea>
+          <div id="tl-text-help" className="flex justify-between gap-3 flex-wrap" style=${{ marginTop: '6px', fontSize: '12px' }}>
+            <span role="alert" style=${{ color: 'var(--bad)' }}>${textError}</span>
+            <span className="mono tnum" style=${{ color: textLen > 5000 ? 'var(--bad)' : 'var(--muted)' }}>${textLen} / 5000</span>
+          </div>
+          <div style=${{ marginTop: '8px' }}>
+            <button type="button" className="btn btn-ghost btn-sm" disabled=${running} onClick=${() => { setText('BREAKING!!! Shocking leaked memo PROVES the miracle cure they do not want you to see. Share before it is deleted!'); setTouched(false); }}>Try a sample</button>
+          </div>` : html`
+          ${!file ? html`<${DropZone} modality=${modality} onFile=${pickFile} />` : html`
+            <div className="panel-flat" style=${{ padding: '12px' }}>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div style=${{ minWidth: 0 }}>
+                  <div style=${{ fontWeight: 600, overflowWrap: 'anywhere' }}>${file.name}</div>
+                  <div className="mono" style=${{ color: 'var(--muted)', fontSize: '12px' }}>${fmtSize(file.size)}</div>
+                </div>
+                <button type="button" className="btn btn-ghost btn-sm" disabled=${running} onClick=${() => { setFile(null); setFileError(''); }}>Remove</button>
+              </div>
+              ${fileUrl && modality === 'image' && html`<img src=${fileUrl} alt="Preview of the uploaded image" style=${{ marginTop: '10px', maxHeight: '260px', borderRadius: '8px', maxWidth: '100%' }} />`}
+              ${fileUrl && modality === 'audio' && html`<audio controls src=${fileUrl} style=${{ marginTop: '10px', width: '100%' }}></audio>`}
+              ${fileUrl && modality === 'video' && html`<video controls src=${fileUrl} style=${{ marginTop: '10px', maxHeight: '260px', maxWidth: '100%', borderRadius: '8px' }}></video>`}
+            </div>`}
+          ${fileError && html`<div role="alert" style=${{ color: 'var(--bad)', marginTop: '8px', fontSize: '13px' }}>${fileError}</div>`}
+          <div style=${{ marginTop: '14px' }}>
+            <label htmlFor="tl-cap" className="label" style=${{ display: 'block', marginBottom: '6px' }}>Claim or caption that comes with it (optional)</label>
+            <input id="tl-cap" className="field" type="text" disabled=${running} maxLength="600" placeholder="e.g. Photo of the flood in Chennai, 2025"
+              aria-invalid=${caption.length > 500 ? 'true' : 'false'} value=${caption} onChange=${(e) => setCaption(e.target.value)} />
+            <div style=${{ color: 'var(--muted)', fontSize: '12px', marginTop: '4px' }}>Adding one lets cross-modal reasoning compare it with the file.</div>
+          </div>`}
+      </div>
+
+      ${running && html`<div className="panel-flat" style=${{ padding: '14px', marginTop: '16px' }} role="status" aria-live="polite">
+        <div className="flex items-center justify-between gap-3">
+          <div className="label">Running ${done} of ${steps.length} steps</div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${cancel}>Cancel</button>
+        </div>
+        <div className="bar" style=${{ margin: '10px 0 12px' }}><span style=${{ width: (done / steps.length * 100) + '%', background: 'linear-gradient(90deg,var(--cyan),var(--violet))', transition: 'width .3s' }}></span></div>
+        <ul style=${{ display: 'grid', gap: '6px' }}>
+          ${steps.map((s, i) => html`<li key=${i} className="flex items-center gap-2" style=${{ color: s.state === 'pending' ? 'var(--muted)' : 'var(--fg)' }}>
+            ${s.state === 'running' ? html`<span className="spin"></span>` : html`<span className="mono" style=${{ width: '16px', textAlign: 'center', color: s.state === 'done' ? 'var(--good)' : 'var(--muted)' }}>${s.state === 'done' ? '✓' : '·'}</span>`}
+            <span>${s.label}</span>
+          </li>`)}
+        </ul>
+      </div>`}
+
+      ${phase === 'error' && err && html`<div role="alert" style=${{ marginTop: '16px', padding: '14px', borderRadius: '12px', border: '1px solid rgba(248,113,113,.5)', background: 'rgba(248,113,113,.1)' }}>
+        <div style=${{ fontWeight: 600, color: '#fecaca' }}>Analysis stopped${err.module ? ' at ' + MODULES[err.module].name : ''}</div>
+        <p style=${{ marginTop: '4px', overflowWrap: 'anywhere' }}>${err.message}</p>
+        <div className="flex gap-2 flex-wrap" style=${{ marginTop: '12px' }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${() => run(false)}>Retry</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${() => run(true)}>Run simulated demo instead</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${() => { setPhase('idle'); setErr(null); }}>Dismiss</button>
+        </div>
+      </div>`}
+
+      <div className="flex items-center gap-3 flex-wrap" style=${{ marginTop: '18px' }}>
+        <button type="button" className="btn btn-primary" disabled=${running} onClick=${() => run(false)}>${running ? 'Analyzing…' : 'Analyze'}</button>
+        <span style=${{ color: 'var(--muted)', fontSize: '12px' }}>Files stay in your browser unless you configure an endpoint.</span>
+      </div>
+    </section>`;
+  }
+
+  /* ---------------- Result ---------------- */
+  function Result({ res, onExport, onNew }) {
+    const v = VERDICT[res.verdict];
+    const sevOrder = { high: 0, medium: 1, low: 2 };
+    const inds = res.indicators.slice().sort((a, b) => sevOrder[a.severity] - sevOrder[b.severity]);
+    const cross = res.modules.find((m) => m.id === 'cross');
+    return html`<div style=${{ display: 'grid', gap: '16px' }}>
+      <div className=${res.mode === 'live' ? 'banner-live' : 'banner-sim'} style=${{ padding: '12px 16px' }} role="note">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className=${'pill ' + (res.mode === 'live' ? 'pill-live' : 'pill-sim')}>${res.mode === 'live' ? 'Live analysis' : res.mode === 'mixed' ? 'Partly simulated' : 'Simulated demo result'}</span>
+          ${res.sample && html`<span className="pill pill-neutral">Sample entry</span>`}
+        </div>
+        <p style=${{ marginTop: '6px', fontSize: '13px' }}>${modeNote(res).replace(/^(SIMULATED DEMO RESULT|PARTLY SIMULATED|LIVE ANALYSIS)\.\s*/, '')}</p>
+      </div>
+
+      <section className="panel" style=${{ padding: '20px' }} aria-label="Authenticity assessment">
+        <div className="flex gap-6 flex-wrap items-center">
+          <div style=${{ flex: '0 0 auto' }}><${Gauge} value=${res.authenticity} color=${v.color} /></div>
+          <div style=${{ flex: '1 1 260px', minWidth: 0 }}>
+            <div className="label">Authenticity assessment</div>
+            <h2 style=${{ fontSize: '26px', fontWeight: 700, color: v.color, marginTop: '2px' }}>${v.label}</h2>
+            <p style=${{ marginTop: '4px' }}>${v.text}</p>
+            <div className="flex gap-4 flex-wrap" style=${{ marginTop: '12px' }}>
+              <div><div className="label">Confidence</div><div className="font-display tnum" style=${{ fontSize: '20px', fontWeight: 600 }}>${res.confidence}%</div></div>
+              <div><div className="label">Risk signals</div><div className="font-display tnum" style=${{ fontSize: '20px', fontWeight: 600 }}>${res.indicators.length}</div></div>
+              <div><div className="label">Input</div><div className="font-display" style=${{ fontSize: '20px', fontWeight: 600 }}>${MODALITIES[res.modality].label}</div></div>
+            </div>
+          </div>
+        </div>
+        <p style=${{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid var(--line)' }}>${res.narrative}
+          <span className=${'pill ' + (res.narrativeSource === 'live' ? 'pill-live' : 'pill-neutral')} style=${{ marginLeft: '8px' }}>${res.narrativeSource === 'live' ? 'From XAI endpoint' : 'Templated summary'}</span></p>
+        ${res.confidence < 55 && html`<p style=${{ marginTop: '8px', color: 'var(--warn)' }}>Confidence is low. Gather more context before relying on this result.</p>`}
+        ${res.verdict !== 'low' && html`<p style=${{ marginTop: '8px', color: 'var(--warn)' }}>Human review is recommended before anyone acts on this result.</p>`}
+        <div className="flex gap-2 flex-wrap" style=${{ marginTop: '16px' }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick=${() => onExport(res)}>Export report</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${onNew}>Close result</button>
+        </div>
+      </section>
+
+      <section className="panel" style=${{ padding: '20px' }} aria-labelledby="mod-h">
+        <h3 id="mod-h" style=${{ fontSize: '17px', fontWeight: 600 }}>Module breakdown</h3>
+        <p style=${{ color: 'var(--muted)', marginTop: '2px' }}>Higher scores mean fewer risk signals from that module.</p>
+        <div style=${{ display: 'grid', gap: '14px', marginTop: '14px' }}>
+          ${res.modules.map((m) => {
+            const c = VERDICT[verdictOf(m.score)].color;
+            return html`<div key=${m.id}>
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap"><strong>${m.name}</strong><${SourcePill} status=${m.status} /></div>
+                <span className="mono tnum" style=${{ color: c }}>${m.score}<span style=${{ color: 'var(--muted)' }}> · ${m.confidence}% conf.</span></span>
+              </div>
+              <div className="bar" style=${{ margin: '6px 0' }} role="img" aria-label=${m.name + ' score ' + m.score + ' of 100'}><span style=${{ width: m.score + '%', background: c }}></span></div>
+              <div style=${{ color: 'var(--muted)', fontSize: '13px' }}>${m.summary}</div>
+            </div>`;
+          })}
+          <div>
+            <div className="flex items-center gap-2 flex-wrap"><strong>${MODULES.xai.name}</strong><span className=${'pill ' + (res.narrativeSource === 'live' ? 'pill-live' : 'pill-neutral')}>${res.narrativeSource === 'live' ? 'Live' : 'Templated'}</span></div>
+            <div style=${{ color: 'var(--muted)', fontSize: '13px', marginTop: '4px' }}>Builds the evidence list below from each module's findings.</div>
+          </div>
+        </div>
+        ${cross && html`<div className="panel-flat" style=${{ padding: '12px', marginTop: '16px' }}>
+          <div className="label">Cross-modal consistency</div>
+          <div style=${{ marginTop: '2px' }}>${cross.score >= 70 ? 'The parts checked agree with each other.' : cross.score >= 40 ? 'Some parts do not fully agree.' : 'Parts of the content conflict.'} <span className="mono tnum" style=${{ color: 'var(--muted)' }}>(${cross.score}/100)</span></div>
+        </div>`}
+      </section>
+
+      <section className="panel" style=${{ padding: '20px' }} aria-labelledby="risk-h">
+        <h3 id="risk-h" style=${{ fontSize: '17px', fontWeight: 600 }}>Risk indicators</h3>
+        ${inds.length === 0 ? html`<p style=${{ marginTop: '8px', color: 'var(--muted)' }}>No risk indicators were raised by these checks.</p>` : html`
+          <ul style=${{ display: 'grid', gap: '10px', marginTop: '12px' }}>
+            ${inds.map((i) => html`<li key=${i.id} className="panel-flat" style=${{ padding: '12px' }}>
+              <div className="flex items-center gap-2 flex-wrap"><span className=${'pill pill-' + i.severity}>${i.severity}</span><strong style=${{ overflowWrap: 'anywhere' }}>${i.label}</strong></div>
+              <div style=${{ color: 'var(--muted)', fontSize: '13px', marginTop: '4px' }}>${MODULES[i.module].name}. ${i.detail}</div>
+            </li>`)}
+          </ul>`}
+        ${res.passes.length > 0 && html`<div style=${{ marginTop: '16px' }}>
+          <div className="label">Checks that passed</div>
+          <ul style=${{ display: 'grid', gap: '6px', marginTop: '8px' }}>${res.passes.map((p, k) => html`<li key=${k} className="flex items-center gap-2"><span className="pill pill-ok">Pass</span><span>${p.label}</span></li>`)}</ul>
+        </div>`}
+      </section>
+
+      <section className="panel" style=${{ padding: '20px' }} aria-labelledby="ev-h">
+        <h3 id="ev-h" style=${{ fontSize: '17px', fontWeight: 600 }}>Evidence and explanations</h3>
+        <p style=${{ color: 'var(--muted)', marginTop: '2px' }}>What was observed, why it matters and how much it counted.</p>
+        ${res.evidence.length === 0 ? html`<p style=${{ marginTop: '10px', color: 'var(--muted)' }}>There are no findings to explain.</p>` : html`
+          <div style=${{ display: 'grid', gap: '8px', marginTop: '12px' }}>
+            ${res.evidence.map((e) => html`<details key=${e.id} className="panel-flat" style=${{ padding: '12px' }}>
+              <summary className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2" style=${{ minWidth: 0 }}><span className="chev mono" aria-hidden="true">›</span><strong style=${{ overflowWrap: 'anywhere' }}>${e.title}</strong></span>
+                <span className="mono tnum" style=${{ color: 'var(--cyan)', flex: '0 0 auto' }}>${e.weight}%</span>
+              </summary>
+              <dl style=${{ display: 'grid', gap: '8px', marginTop: '10px', fontSize: '13px' }}>
+                <div><dt className="label">Observed</dt><dd>${e.observed}</dd></div>
+                <div><dt className="label">Why it matters</dt><dd>${e.why || 'The endpoint did not supply an explanation.'}</dd></div>
+                <div><dt className="label">Source module</dt><dd>${MODULES[e.module].name}</dd></div>
+                <div><dt className="label">Uncertainty</dt><dd>${e.uncertainty}. Treat this as one signal among several.</dd></div>
+              </dl>
+            </details>`)}
+          </div>`}
+      </section>
+
+      <section className="panel" style=${{ padding: '20px' }} aria-labelledby="lim-h">
+        <h3 id="lim-h" style=${{ fontSize: '17px', fontWeight: 600 }}>Limits of this result</h3>
+        <ul style=${{ marginTop: '10px', display: 'grid', gap: '6px', paddingLeft: '18px', listStyle: 'disc', color: 'var(--muted)' }}>${res.limitations.map((x, k) => html`<li key=${k}>${x}</li>`)}</ul>
+      </section>
+    </div>`;
+  }
+
+  /* ---------------- Export modal ---------------- */
+  function ExportModal({ res, onClose, toast }) {
+    const md = useMemo(() => toMarkdown(res), [res]);
+    const json = useMemo(() => JSON.stringify({ simulationNotice: modeNote(res), ...res }, null, 2), [res]);
+    const [tab, setTab] = useState('md');
+    const closeRef = useRef(null);
+    useEffect(() => {
+      if (closeRef.current) closeRef.current.focus();
+      const h = (e) => { if (e.key === 'Escape') onClose(); };
+      document.addEventListener('keydown', h);
+      return () => document.removeEventListener('keydown', h);
+    }, []);
+    const content = tab === 'md' ? md : json;
+    const copy = async () => { try { await navigator.clipboard.writeText(content); toast('Copied to clipboard.'); } catch (e) { toast('Copy was blocked. Select the text and copy it yourself.'); } };
+    return html`<div className="modal-back" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal panel" style=${{ padding: '20px' }} role="dialog" aria-modal="true" aria-labelledby="ex-h">
+        <div className="flex items-start justify-between gap-3">
+          <div><h2 id="ex-h" style=${{ fontSize: '20px', fontWeight: 600 }}>Export report</h2><p style=${{ color: 'var(--muted)' }}>${res.id} · ${fmtDate(res.createdAt)}</p></div>
+          <button ref=${closeRef} type="button" className="btn btn-ghost btn-sm" onClick=${onClose}>Close</button>
+        </div>
+        ${res.mode !== 'live' && html`<p className="banner-sim" style=${{ padding: '8px 12px', marginTop: '12px', fontSize: '13px' }}>The exported report carries the ${res.mode === 'simulated' ? 'simulated demo' : 'partly simulated'} label.</p>`}
+        <div className="flex gap-2" style=${{ marginTop: '14px' }} role="tablist" aria-label="Report format">
+          <button type="button" role="tab" className="tab" style=${{ flex: '0 0 auto', padding: '8px 16px', flexDirection: 'row' }} aria-selected=${tab === 'md'} onClick=${() => setTab('md')}>Markdown</button>
+          <button type="button" role="tab" className="tab" style=${{ flex: '0 0 auto', padding: '8px 16px', flexDirection: 'row' }} aria-selected=${tab === 'json'} onClick=${() => setTab('json')}>JSON</button>
+        </div>
+        <label htmlFor="ex-text" className="sr-only">Report content</label>
+        <textarea id="ex-text" className="field mono" rows="12" readOnly value=${content} onFocus=${(e) => e.target.select()} style=${{ marginTop: '10px', fontSize: '12px' }}></textarea>
+        <div className="flex gap-2 flex-wrap" style=${{ marginTop: '12px' }}>
+          <button type="button" className="btn btn-primary btn-sm" onClick=${copy}>Copy ${tab === 'md' ? 'Markdown' : 'JSON'}</button>
+          <button type="button" className="btn btn-ghost btn-sm" onClick=${() => download('truth-lens-' + res.id + (tab === 'md' ? '.md' : '.json'), content, tab === 'md' ? 'text/markdown' : 'application/json')}>Download file</button>
+        </div>
+        <p style=${{ color: 'var(--muted)', fontSize: '12px', marginTop: '10px' }}>Downloads are blocked inside the hosted preview. Use Copy there, or open the downloaded app file to save directly.</p>
+      </div>
+    </div>`;
+  }
+
+  /* ---------------- Dashboard ---------------- */
+  function Overview({ history, onOpen }) {
+    const total = history.length;
+    const review = history.filter((h) => h.authenticity < 70).length;
+    const avgConf = total ? Math.round(mean(history.map((h) => h.confidence))) : 0;
+    const samples = history.filter((h) => h.sample).length;
+    const counts = Object.keys(MODALITIES).map((k) => ({ k, n: history.filter((h) => h.modality === k).length }));
+    const maxN = Math.max(1, ...counts.map((c) => c.n));
+    return html`<aside className="panel" style=${{ padding: '20px' }} aria-labelledby="ov-h">
+      <h2 id="ov-h" style=${{ fontSize: '17px', fontWeight: 600 }}>Overview</h2>
+      <div className="flex gap-4 flex-wrap" style=${{ marginTop: '12px' }}>
+        <div><div className="label">Analyses</div><div className="font-display tnum" style=${{ fontSize: '24px', fontWeight: 700 }}>${total}</div></div>
+        <div><div className="label">Need review</div><div className="font-display tnum" style=${{ fontSize: '24px', fontWeight: 700, color: review ? 'var(--warn)' : 'inherit' }}>${review}</div></div>
+        <div><div className="label">Avg. confidence</div><div className="font-display tnum" style=${{ fontSize: '24px', fontWeight: 700 }}>${total ? avgConf + '%' : '-'}</div></div>
+      </div>
+      <div style=${{ marginTop: '16px', display: 'grid', gap: '8px' }}>
+        ${counts.map((c) => html`<div key=${c.k} className="flex items-center gap-3"><span className="label" style=${{ width: '44px' }}>${MODALITIES[c.k].label}</span>
+          <div className="bar" style=${{ flex: 1 }}><span style=${{ width: (c.n / maxN * 100) + '%', background: 'linear-gradient(90deg,var(--cyan),var(--violet))' }}></span></div>
+          <span className="mono tnum" style=${{ width: '20px', textAlign: 'right' }}>${c.n}</span></div>`)}
+      </div>
+      ${samples > 0 && html`<p style=${{ color: 'var(--muted)', fontSize: '12px', marginTop: '12px' }}>Includes ${samples} simulated sample ${samples > 1 ? 'entries' : 'entry'} so the dashboard is not empty.</p>`}
+      <h3 style=${{ fontSize: '15px', fontWeight: 600, marginTop: '20px' }}>Recent</h3>
+      ${history.length === 0 ? html`<p style=${{ color: 'var(--muted)', marginTop: '6px' }}>Nothing yet. Run an analysis and it will appear here.</p>` : html`
+        <ul style=${{ display: 'grid', gap: '8px', marginTop: '8px' }}>
+          ${history.slice(0, 4).map((h) => html`<li key=${h.id}><button type="button" className="panel-flat" onClick=${() => onOpen(h)} style=${{ width: '100%', textAlign: 'left', padding: '10px 12px', cursor: 'pointer', color: 'inherit', font: 'inherit' }}>
+            <div className="flex items-center justify-between gap-2"><span className=${'pill ' + VERDICT[h.verdict].pill}>${VERDICT[h.verdict].label}</span><span className="mono tnum" style=${{ color: 'var(--muted)' }}>${h.authenticity}</span></div>
+            <div style=${{ marginTop: '4px', overflowWrap: 'anywhere', fontSize: '13px' }}>${h.input.fileName || h.input.text.slice(0, 60) + (h.input.text.length > 60 ? '…' : '')}</div>
+          </button></li>`)}
+        </ul>`}
+    </aside>`;
+  }
+
+  function Dashboard({ history, active, cfg, onComplete, onExport, onOpen, onClose, toast }) {
+    const ref = useRef(null);
+    const key = active ? active.id : '';
+    useEffect(() => {
+      if (key && ref.current) {
+        const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        ref.current.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      }
+    }, [key]);
+    return html`<div>
+      <div style=${{ marginBottom: '20px' }}>
+        <h1 style=${{ fontSize: 'clamp(26px, 4vw, 38px)', fontWeight: 700, lineHeight: 1.15 }}>See beyond the content. <span style=${{ background: 'linear-gradient(90deg,var(--cyan),var(--violet))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>Understand what is real.</span></h1>
+        <p style=${{ color: 'var(--muted)', marginTop: '8px', maxWidth: '62ch' }}>Check text, images, audio and video in one place. Results are indicators to guide verification, not verdicts.</p>
+      </div>
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] items-start">
+        <div style=${{ display: 'grid', gap: '20px', minWidth: 0 }}>
+          <${Analyzer} cfg=${cfg} onComplete=${onComplete} toast=${toast} />
+          <div ref=${ref} style=${{ scrollMarginTop: '90px' }}>
+            ${active ? html`<${Result} res=${active} onExport=${onExport} onNew=${onClose} />` : html`<div className="panel-flat" style=${{ padding: '20px', color: 'var(--muted)' }}>Your assessment, risk indicators and evidence will appear here after you run an analysis.</div>`}
+          </div>
+        </div>
+        <${Overview} history=${history} onOpen=${onOpen} />
+      </div>
+    </div>`;
+  }
+
+  /* ---------------- History ---------------- */
+  function HistoryView({ history, onOpen, onDelete, onClear, onExport }) {
+    const [q, setQ] = useState('');
+    const [mod, setMod] = useState('all');
+    const [ver, setVer] = useState('all');
+    const [confirm, setConfirm] = useState(false);
+    const list = history.filter((h) => (mod === 'all' || h.modality === mod) && (ver === 'all' || h.verdict === ver)
+      && (!q.trim() || (h.input.fileName + ' ' + h.input.text + ' ' + h.input.caption + ' ' + h.id).toLowerCase().includes(q.trim().toLowerCase())));
+    return html`<div>
+      <h1 style=${{ fontSize: '30px', fontWeight: 700 }}>Analysis history</h1>
+      <p style=${{ color: 'var(--muted)', marginTop: '4px' }}>Stored in this browser only. Files themselves are never saved, only the results.</p>
+      <div className="flex gap-3 flex-wrap" style=${{ marginTop: '16px' }}>
+        <div style=${{ flex: '1 1 220px' }}><label htmlFor="h-q" className="sr-only">Search history</label><input id="h-q" className="field" type="search" placeholder="Search by file name, text or ID" value=${q} onChange=${(e) => setQ(e.target.value)} /></div>
+        <div><label htmlFor="h-m" className="sr-only">Filter by type</label><select id="h-m" className="field" value=${mod} onChange=${(e) => setMod(e.target.value)}><option value="all">All types</option>${Object.keys(MODALITIES).map((k) => html`<option key=${k} value=${k}>${MODALITIES[k].label}</option>`)}</select></div>
+        <div><label htmlFor="h-v" className="sr-only">Filter by reading</label><select id="h-v" className="field" value=${ver} onChange=${(e) => setVer(e.target.value)}><option value="all">All readings</option>${Object.keys(VERDICT).map((k) => html`<option key=${k} value=${k}>${VERDICT[k].label}</option>`)}</select></div>
+      </div>
+      <div style=${{ marginTop: '16px', display: 'grid', gap: '10px' }}>
+        ${list.length === 0 && html`<div className="panel-flat" style=${{ padding: '24px', textAlign: 'center', color: 'var(--muted)' }}>${history.length === 0 ? 'No analyses yet. Run one from the Dashboard.' : 'No analyses match these filters.'}</div>`}
+        ${list.map((h) => html`<article key=${h.id} className="panel" style=${{ padding: '14px 16px' }}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className=${'pill ' + VERDICT[h.verdict].pill}>${VERDICT[h.verdict].label}</span>
+            <span className="pill pill-neutral">${MODALITIES[h.modality].label}</span>
+            <${SourcePill} status=${h.mode === 'live' ? 'live' : 'simulated'} />
+            ${h.sample && html`<span className="pill pill-neutral">Sample</span>`}
+            <span className="mono" style=${{ color: 'var(--muted)', fontSize: '12px', marginLeft: 'auto' }}>${fmtDate(h.createdAt)}</span>
+          </div>
+          <div style=${{ marginTop: '8px', overflowWrap: 'anywhere', fontWeight: 500 }}>${h.input.fileName || (h.input.text.slice(0, 120) + (h.input.text.length > 120 ? '…' : ''))}</div>
+          <div className="mono tnum" style=${{ color: 'var(--muted)', fontSize: '12px', marginTop: '2px' }}>Score ${h.authenticity}/100 · confidence ${h.confidence}% · ${h.indicators.length} risk signal${h.indicators.length === 1 ? '' : 's'} · ${h.id}</div>
+          <div className="flex gap-2 flex-wrap" style=${{ marginTop: '10px' }}>
+            <button type="button" className="btn btn-ghost btn-sm" onClick=${() => onOpen(h)}>Open</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick=${() => onExport(h)}>Export</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick=${() => onDelete(h.id)}>Delete</button>
+          </div>
+        </article>`)}
+      </div>
+      ${history.length > 0 && html`<div style=${{ marginTop: '20px' }}>
+        ${!confirm ? html`<button type="button" className="btn btn-ghost btn-sm" onClick=${() => setConfirm(true)}>Clear all history</button>` : html`
+          <div className="flex items-center gap-2 flex-wrap" role="alertdialog" aria-label="Confirm clearing history"><span>Delete all ${history.length} entries?</span>
+            <button type="button" className="btn btn-danger btn-sm" onClick=${() => { onClear(); setConfirm(false); }}>Yes, delete all</button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick=${() => setConfirm(false)}>Keep them</button></div>`}
+      </div>`}
+    </div>`;
+  }
+
+  /* ---------------- Pipeline ---------------- */
+  const REQ_EX = 'POST {your endpoint}\nAuthorization: Bearer <key>      (optional)\nContent-Type: multipart/form-data\n\nmodule     cv | audio | mllm | cross\nmodality   text | image | audio | video\ntext       the pasted text (text mode)\ncaption    the claim or caption (optional)\nfile       the uploaded file (file modes)';
+  const RES_EX = '{\n  "authenticity": 62,        // 0-100, higher = fewer risk signals\n  "confidence": 71,          // 0-100\n  "summary": "One sentence in plain language",\n  "indicators": [\n    {\n      "label": "Lighting direction differs",\n      "severity": "medium",   // low | medium | high\n      "detail": "What was observed",\n      "why": "Why it matters"\n    }\n  ]\n}';
+  const XAI_EX = 'POST {xai endpoint}   Content-Type: application/json\n{ "modality": "image", "findings": [ { "module": "cv", "authenticity": 62, "indicators": [ ... ] } ] }\n\nResponse: { "narrative": "Plain-language explanation of the findings" }';
+
+  function PipelineView({ cfg }) {
+    const used = (id) => Object.keys(PIPELINE).filter((m) => PIPELINE[m].includes(id));
+    return html`<div>
+      <h1 style=${{ fontSize: '30px', fontWeight: 700 }}>Analysis pipeline</h1>
+      <p style=${{ color: 'var(--muted)', marginTop: '4px', maxWidth: '64ch' }}>Each module is a separate adapter. Without an endpoint it returns a labelled simulated result. With one, the app sends the content and uses the response.</p>
+      <div className="flex items-center gap-2 flex-wrap" style=${{ marginTop: '16px' }} aria-label="Pipeline stages">
+        ${['Input', 'Modality modules', 'Cross-modal reasoning', 'Explainable result'].map((s, i, a) => html`<span key=${s} className="flex items-center gap-2"><span className="panel-flat" style=${{ padding: '6px 12px' }}>${s}</span>${i < a.length - 1 && html`<span style=${{ color: 'var(--cyan)' }}>→</span>`}</span>`)}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2" style=${{ marginTop: '20px' }}>
+        ${Object.keys(MODULES).map((id) => html`<article key=${id} className="panel" style=${{ padding: '18px', minWidth: 0 }}>
+          <div className="flex items-center justify-between gap-2 flex-wrap"><h2 style=${{ fontSize: '17px', fontWeight: 600 }}>${MODULES[id].name}</h2>
+            <span className=${'pill ' + (cfg.urls[id] ? 'pill-live' : 'pill-sim')}>${cfg.urls[id] ? 'Endpoint set' : 'Simulated'}</span></div>
+          <p style=${{ color: 'var(--muted)', marginTop: '6px' }}>${MODULES[id].desc}</p>
+          <div className="flex gap-2 flex-wrap" style=${{ marginTop: '10px' }}>${used(id).map((m) => html`<span key=${m} className="pill pill-neutral">${MODALITIES[m].label}</span>`)}</div>
+        </article>`)}
+      </div>
+      <section className="panel" style=${{ padding: '18px', marginTop: '20px' }}>
+        <h2 style=${{ fontSize: '17px', fontWeight: 600 }}>Endpoint contract</h2>
+        <p style=${{ color: 'var(--muted)', marginTop: '4px' }}>Set endpoints on the Config page. A module endpoint should accept and return this:</p>
+        <div className="label" style=${{ marginTop: '12px' }}>Request</div><pre className="code" style=${{ marginTop: '6px' }}>${REQ_EX}</pre>
+        <div className="label" style=${{ marginTop: '12px' }}>Response</div><pre className="code" style=${{ marginTop: '6px' }}>${RES_EX}</pre>
+        <div className="label" style=${{ marginTop: '12px' }}>Explainable AI endpoint (optional)</div><pre className="code" style=${{ marginTop: '6px' }}>${XAI_EX}</pre>
+        <p style=${{ color: 'var(--muted)', fontSize: '13px', marginTop: '12px' }}>Browsers only allow calls to endpoints that send CORS headers. If you need to keep a key private, point the app at your own small server that holds the key and forwards the request.</p>
+      </section>
+    </div>`;
+  }
+
+  /* ---------------- Config ---------------- */
+  function ConfigView({ cfg, setCfg, toast }) {
+    const [tests, setTests] = useState({});
+    const set = (kind, id, v) => setCfg((c) => ({ ...c, [kind]: { ...c[kind], [id]: v } }));
+    const test = async (id) => {
+      const url = cfg.urls[id].trim();
+      try { new URL(url); } catch (e) { setTests((t) => ({ ...t, [id]: { ok: false, msg: 'Enter a full URL starting with https://' } })); return; }
+      setTests((t) => ({ ...t, [id]: { busy: true } }));
+      try {
+        const fd = new FormData(); fd.append('module', id); fd.append('ping', 'true');
+        const headers = cfg.keys[id] ? { Authorization: 'Bearer ' + cfg.keys[id] } : {};
+        const res = await fetch(url, { method: 'POST', body: fd, headers });
+        setTests((t) => ({ ...t, [id]: { ok: res.ok, msg: res.ok ? 'Endpoint answered (HTTP ' + res.status + ').' : 'Endpoint answered with HTTP ' + res.status + '.' } }));
+      } catch (e) {
+        setTests((t) => ({ ...t, [id]: { ok: false, msg: 'Could not reach it. Check the URL and CORS settings. The hosted preview blocks outside requests.' } }));
+      }
+    };
+    return html`<div>
+      <h1 style=${{ fontSize: '30px', fontWeight: 700 }}>Config</h1>
+      <p style=${{ color: 'var(--muted)', marginTop: '4px', maxWidth: '64ch' }}>Leave an endpoint empty to keep that module simulated. Keys live in memory for this session only and are never saved.</p>
+      <div style=${{ display: 'grid', gap: '14px', marginTop: '16px' }}>
+        ${Object.keys(MODULES).map((id) => html`<section key=${id} className="panel" style=${{ padding: '16px' }}>
+          <div className="flex items-center justify-between gap-2 flex-wrap"><h2 style=${{ fontSize: '16px', fontWeight: 600 }}>${MODULES[id].name}</h2>
+            <span className=${'pill ' + (cfg.urls[id] ? 'pill-live' : 'pill-sim')}>${cfg.urls[id] ? 'Endpoint set' : 'Simulated'}</span></div>
+          <div className="grid gap-3 md:grid-cols-2" style=${{ marginTop: '10px' }}>
+            <div style=${{ minWidth: 0 }}><label htmlFor=${'u-' + id} className="label" style=${{ display: 'block', marginBottom: '4px' }}>Endpoint URL</label>
+              <input id=${'u-' + id} className="field" type="url" placeholder="https://your-server.example/analyze" value=${cfg.urls[id]} onChange=${(e) => set('urls', id, e.target.value)} /></div>
+            <div style=${{ minWidth: 0 }}><label htmlFor=${'k-' + id} className="label" style=${{ display: 'block', marginBottom: '4px' }}>API key (optional)</label>
+              <input id=${'k-' + id} className="field" type="password" autoComplete="off" placeholder="Bearer token" value=${cfg.keys[id]} onChange=${(e) => set('keys', id, e.target.value)} /></div>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap" style=${{ marginTop: '10px' }}>
+            <button type="button" className="btn btn-ghost btn-sm" disabled=${!cfg.urls[id].trim() || (tests[id] && tests[id].busy)} onClick=${() => test(id)}>${tests[id] && tests[id].busy ? 'Testing…' : 'Test connection'}</button>
+            ${tests[id] && tests[id].msg && html`<span role="status" style=${{ color: tests[id].ok ? 'var(--good)' : 'var(--bad)', fontSize: '13px' }}>${tests[id].msg}</span>`}
+          </div>
+        </section>`)}
+        <section className="panel" style=${{ padding: '16px' }}>
+          <h2 style=${{ fontSize: '16px', fontWeight: 600 }}>Demo tools</h2>
+          <label htmlFor="fail-at" className="label" style=${{ display: 'block', margin: '10px 0 4px' }}>Force a failure at</label>
+          <select id="fail-at" className="field" style=${{ maxWidth: '320px' }} value=${cfg.failAt} onChange=${(e) => setCfg((c) => ({ ...c, failAt: e.target.value }))}>
+            <option value="">No forced failure</option>
+            ${Object.keys(MODULES).map((id) => html`<option key=${id} value=${id}>${MODULES[id].name}</option>`)}
+          </select>
+          <p style=${{ color: 'var(--muted)', fontSize: '13px', marginTop: '8px' }}>Shows the error state during a demo. The error card offers Retry and a simulated run.</p>
+          <p style=${{ color: 'var(--muted)', fontSize: '13px', marginTop: '8px' }}>Simulated results are seeded from the input. Words like "fake", "edited" or "leaked" in a file name or text lower the simulated score, and words like "original" or "verified" raise it, so you can demo both outcomes. This is a demo behaviour, not detection.</p>
+        </section>
+      </div>
+    </div>`;
+  }
+
+  /* ---------------- App shell ---------------- */
+  const ROUTES = [['dashboard', 'Dashboard'], ['history', 'History'], ['pipeline', 'Pipeline'], ['config', 'Config']];
+  const routeFromHash = () => { const h = (location.hash || '').replace('#', ''); return ROUTES.some((r) => r[0] === h) ? h : 'dashboard'; };
+
+  function App() {
+    const [route, setRoute] = useState(routeFromHash);
+    const [history, setHistory] = useState(loadHistory);
+    const [active, setActive] = useState(null);
+    const [exporting, setExporting] = useState(null);
+    const [msg, setMsg] = useState('');
+    const [cfg, setCfg] = useState({ urls: { mllm: API + '/api/analyze/mllm', cv: API + '/api/analyze/cv', audio: API + '/api/analyze/audio', cross: API + '/api/analyze/cross', xai: API + '/api/analyze/xai' }, keys: { mllm: '', cv: '', audio: '', cross: '', xai: '' }, failAt: '' });
+    const tRef = useRef(null);
+
+    useEffect(() => { const f = () => setRoute(routeFromHash()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
+    useEffect(() => { saveHistory(history); }, [history]);
+    useEffect(() => { api('/api/history').then((rows) => { if (Array.isArray(rows) && rows.length) setHistory(rows); }).catch(() => {}); }, []);
+
+    const toast = (m) => { setMsg(m); clearTimeout(tRef.current); tRef.current = setTimeout(() => setMsg(''), 3200); };
+    const go = (r) => { location.hash = r; };
+    const onComplete = (res) => { setActive(res); setHistory((h) => [res].concat(h).slice(0, 50)); apiSave(res); };
+    const onOpen = (res) => { setActive(res); go('dashboard'); window.scrollTo(0, 0); };
+    const onDelete = (id) => { apiDelete(id); setHistory((h) => h.filter((x) => x.id !== id)); if (active && active.id === id) setActive(null); toast('Entry deleted.'); };
+
+    return html`<div className="wrap">
+      <header className="topbar">
+        <div className="wrap flex items-center justify-between gap-3 flex-wrap" style=${{ padding: '10px 0' }}>
+          <a href="#dashboard" className="flex items-center gap-2" style=${{ textDecoration: 'none', color: 'inherit' }} aria-label="Truth Lens home">
+            <${LensMark} />
+            <span><span className="font-display" style=${{ fontSize: '19px', fontWeight: 700, display: 'block', lineHeight: 1.1 }}>Truth Lens</span><span className="label" style=${{ fontSize: '10px' }}>Multimodal verification</span></span>
+          </a>
+          <nav className="nav" aria-label="Main">${ROUTES.map((r) => html`<a key=${r[0]} href=${'#' + r[0]} aria-current=${route === r[0] ? 'page' : undefined}>${r[1]}</a>`)}</nav>
+        </div>
+      </header>
+      <main style=${{ padding: '28px 0 48px' }}>
+        ${route === 'dashboard' && html`<${Dashboard} history=${history} active=${active} cfg=${cfg} onComplete=${onComplete} onExport=${setExporting} onOpen=${onOpen} onClose=${() => setActive(null)} toast=${toast} />`}
+        ${route === 'history' && html`<${HistoryView} history=${history} onOpen=${onOpen} onDelete=${onDelete} onClear=${() => { apiClear(); setHistory([]); setActive(null); toast('History cleared.'); }} onExport=${setExporting} />`}
+        ${route === 'pipeline' && html`<${PipelineView} cfg=${cfg} />`}
+        ${route === 'config' && html`<${ConfigView} cfg=${cfg} setCfg=${setCfg} toast=${toast} />`}
+      </main>
+      <footer style=${{ borderTop: '1px solid var(--line)', padding: '16px 0 28px', color: 'var(--muted)', fontSize: '12px' }}>
+        Truth Lens helps people check content. It cannot guarantee that anything is real or fake, and should not be the only basis for accusing anyone.
+      </footer>
+      ${exporting && html`<${ExportModal} res=${exporting} onClose=${() => setExporting(null)} toast=${toast} />`}
+      ${msg && html`<div className="toast" role="status">${msg}</div>`}
+    </div>`;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+})();
+</script>
+
+</body></html>
